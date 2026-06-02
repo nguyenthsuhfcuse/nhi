@@ -1,0 +1,214 @@
+ <!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Chấm Điểm Phát Âm Tiếng Trung</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #bdc3c7;
+            background: linear-gradient(135deg, #de6262, #ffb88c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 26px;
+            margin-bottom: 5px;
+        }
+        .sub-title {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .sentence-box {
+            background-color: #fff5f5;
+            border: 2px dashed #ffb88c;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 28px; /* Chữ tiếng Trung cần to để dễ nhìn */
+            font-weight: bold;
+            color: #d32f2f;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+        .pinyin {
+            font-size: 16px;
+            color: #7f8c8d;
+            font-weight: normal;
+            margin-top: 5px;
+            display: block;
+        }
+        button {
+            background: linear-gradient(135deg, #de6262, #ffb88c);
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(222, 98, 98, 0.3);
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(222, 98, 98, 0.4);
+        }
+        button:disabled {
+            background: #ccc;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 15px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .result-section {
+            margin-top: 25px;
+            border-top: 2px solid #f1f2f6;
+            padding-top: 20px;
+        }
+        .score {
+            font-size: 36px;
+            font-weight: bold;
+            color: #2ed573;
+            margin: 10px 0;
+        }
+        .comparison {
+            margin-top: 15px;
+            font-size: 20px;
+            letter-spacing: 1px;
+        }
+        .correct { color: #2ed573; font-weight: bold; }
+        .wrong { color: #ff4757; font-weight: bold; text-decoration: line-through; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>汉语发音测试</h1>
+    <div class="sub-title">Luyện Phát Âm Tiếng Trung Miễn Phí</div>
+    
+    <p>Hãy đọc câu tiếng Trung dưới đây:</p>
+    <div class="sentence-box">
+        <span id="target-sentence">祝你 birthday 快乐，身体健康！</span>
+        </div>
+    
+    <button id="btn-speak">🎤 开始说话 (Bắt đầu nói)</button>
+    <p class="status" id="status">Nhấn nút, cho phép micro và bắt đầu nói...</p>
+    
+    <div class="result-section" id="result-section" style="display: none;">
+        <div>Kết quả chính xác:</div>
+        <div class="score" id="score-display">0%</div>
+        <div class="comparison" id="comparison-display"></div>
+    </div>
+</div>
+
+<script>
+    // Khởi tạo SpeechRecognition của Google trên trình duyệt
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        alert("Trình duyệt không hỗ trợ Web Speech API. Hãy sử dụng Google Chrome bản mới nhất!");
+    } else {
+        const recognition = new SpeechRecognition();
+        
+        // CẤU HÌNH QUAN TRỌNG: Chọn tiếng Trung Phổ Thông (Mandarin - Mainland China)
+        recognition.lang = 'zh-CN'; 
+        recognition.interimResults = false; // Chỉ nhận kết quả cuối cùng khi dừng nói
+        recognition.maxAlternatives = 1;
+
+        const btnSpeak = document.getElementById('btn-speak');
+        const statusText = document.getElementById('status');
+        const targetSentence = document.getElementById('target-sentence').innerText;
+        const resultSection = document.getElementById('result-section');
+        const scoreDisplay = document.getElementById('score-display');
+        const comparisonDisplay = document.getElementById('comparison-display');
+
+        // Bắt đầu lắng nghe
+        btnSpeak.addEventListener('click', () => {
+            recognition.start();
+            btnSpeak.disabled = true;
+            statusText.innerText = "🗣️ 请说话... Đang lắng nghe giọng Trung của bạn...";
+            statusText.style.color = "#de6262";
+            resultSection.style.display = "none";
+        });
+
+        // Xử lý khi nhận diện thành công
+        recognition.onresult = (event) => {
+            const userSpeech = event.results[0][0].transcript;
+            statusText.innerText = "✅ Đã thu âm xong! Đang phân tích...";
+            statusText.style.color = "#2ed573";
+            
+            chamDiemTiengTrung(targetSentence, userSpeech);
+        };
+
+        // Xử lý lỗi hệ thống (micro, mạng...)
+        recognition.onerror = (event) => {
+            statusText.innerText = "❌ Lỗi: " + event.error + ". Vui lòng thử lại.";
+            statusText.style.color = "#ff4757";
+            btnSpeak.disabled = false;
+        };
+
+        recognition.onend = () => {
+            btnSpeak.disabled = false;
+        };
+
+        // Thuật toán chấm điểm tiếng Trung (So sánh theo từng chữ đơn lẻ)
+        function chamDiemTiengTrung(mau, giongDoc) {
+            // Hàm xóa bỏ các dấu câu (cả dấu câu tiếng Trung và tiếng Anh)
+            const cleanStr = (str) => str.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()！？。，、“”（）]/g,"").trim();
+            
+            const chuoiMau = cleanStr(mau);
+            const chuoiDoc = cleanStr(giongDoc);
+            
+            // Chuyển chuỗi thành mảng các ký tự (vì tiếng Trung không dùng dấu cách tách từ như tiếng Anh)
+            const mangMau = Array.from(chuoiMau);
+            const mangDoc = Array.from(chuoiDoc);
+            
+            let soChuDung = 0;
+            let htmlKetQua = "<strong>Kết quả so sánh:</strong><br>";
+
+            // Kiểm tra từng chữ Hán một
+            mangMau.forEach((chu) => {
+                // Nếu chữ đó xuất hiện trong đoạn người dùng nói
+                if (mangDoc.includes(chu)) {
+                    soChuDung++;
+                    htmlKetQua += `<span class="correct">${chu}</span>`;
+                    // Xóa chữ đã khớp để tránh trùng lặp nếu nói lặp từ
+                    mangDoc.splice(mangDoc.indexOf(chu), 1);
+                } else {
+                    // Nếu người dùng phát âm sai hoặc thiếu chữ này
+                    htmlKetQua += `<span class="wrong">${chu}</span>`;
+                }
+            });
+
+            // Tính điểm phần trăm (%)
+            const phanTram = Math.round((soChuDung / mangMau.length) * 100);
+            
+            // Hiển thị kết quả ra giao diện
+            scoreDisplay.innerText = phanTram + "%";
+            comparisonDisplay.innerHTML = htmlKetQua + `<br><br><span style="font-size:14px; color:#7f8c8d;">(Hệ thống nghe được: "${giongDoc}")</span>`;
+            resultSection.style.display = "block";
+        }
+    }
+</script>
+</body>
+</html>
